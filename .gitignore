@@ -1,0 +1,12 @@
+# env and certs: symlinks to ../files/, which lives outside the repo and is
+# never committed
+.env
+ssl
+
+# build output
+ships-go-3d
+ships3d
+
+# Others
+__debug_bin*
+.idea
