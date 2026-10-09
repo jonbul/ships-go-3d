@@ -1,0 +1,67 @@
+# Builds, vets and tests ships-go-3d, then publishes the binary as a GitHub
+# release: `latest-snapshot` for PRs and main, `v<version>` (from
+# metadata.properties) for main.
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+    types: [opened, synchronize, reopened]
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: go.mod
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Vet
+      run: go vet ./...
+
+    # The tests need neither MongoDB nor a .env: the game hub is tested with
+    # an in-memory ship loader over real websockets.
+    - name: Test
+      run: go test -race ./...
+
+    - name: Build
+      run: CGO_ENABLED=0 go build -v -o ships-go-3d .
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ships-go-3d
+        path: ships-go-3d
+
+    - name: Get version
+      id: version
+      run: echo "version=$(grep '^version=' metadata.properties | cut -d'=' -f2)" >> $GITHUB_OUTPUT
+
+    - name: Create snapshot
+      if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: latest-snapshot
+        name: Latest Snapshot
+        prerelease: true
+        files: ships-go-3d
+
+    - name: Create release
+      if: github.ref == 'refs/heads/main'
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.version.outputs.version }}
+        name: Release v${{ steps.version.outputs.version }}
+        files: ships-go-3d
