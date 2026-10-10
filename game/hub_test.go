@@ -313,3 +313,34 @@ func TestProtocolFieldNames(t *testing.T) {
 		t.Errorf("damage = %s, want %s", frame, want)
 	}
 }
+
+func TestRateLimitToleratesBurstsButNotFloods(t *testing.T) {
+	start := time.Unix(1_000_000, 0)
+	c := &client{}
+
+	// A stalled mobile connection catching up: hundreds of messages at once.
+	for i := 0; i < 300; i++ {
+		if !c.allowMessage(start) {
+			t.Fatalf("burst message %d refused", i)
+		}
+	}
+
+	// A normal client afterwards (30/s, half the rate) is never refused.
+	now := start
+	for i := 0; i < 30*60; i++ {
+		now = now.Add(time.Second / 30)
+		if !c.allowMessage(now) {
+			t.Fatalf("normal traffic refused after %v", now.Sub(start))
+		}
+	}
+
+	// A flood (1000/s) empties the bucket within a second or so.
+	refused := false
+	for i := 0; i < 2000 && !refused; i++ {
+		now = now.Add(time.Millisecond)
+		refused = !c.allowMessage(now)
+	}
+	if !refused {
+		t.Fatal("a sustained flood was never refused")
+	}
+}

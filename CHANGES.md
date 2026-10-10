@@ -1,5 +1,17 @@
 CHANGES
 =======
+Version 0.2.0 - 2026-10-10
+------------------
+Players on mobile data are no longer thrown out of the game after a few
+seconds.
+
+Bugfixes
+- Flood protection is now a token bucket (60 messages a second sustained,
+  bursts of up to 400) instead of a hard 120 per second. A mobile connection
+  that stalls delivers everything the browser queued meanwhile in one go,
+  and that catch-up burst was being treated as a flood. A client that is cut
+  off is now told why before its connection closes.
+
 Version 0.1.0 - 2026-10-09
 ------------------
 First version: the backend of Ships 3D, a 3D take on the Ships game where
