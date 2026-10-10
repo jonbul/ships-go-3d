@@ -1,6 +1,6 @@
 CHANGES
 =======
-Version 0.2.0 - 2026-10-XX
+Version 0.2.0 - 2026-10-10
 ------------------
 Players on mobile data are no longer thrown out of the game after a few
 seconds.
