@@ -198,7 +198,10 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = conn.SetReadDeadline(time.Now().Add(pongTimeout))
 		if !c.allowMessage(h.now()) {
-			log.Printf("game: disconnecting %s, too many messages", id)
+			log.Printf("game: disconnecting %s, too many messages (sustained over %.0f/s)", id, messageRate)
+			// Say why, rather than just dropping the connection.
+			h.sendTo(c, errorMsg{Type: msgError, Message: "Disconnected: your connection sent too many messages."})
+			time.Sleep(rateLimitGrace)
 			return
 		}
 		h.handleMessage(id, c, identity, data)

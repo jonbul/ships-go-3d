@@ -22,9 +22,19 @@ const (
 	// maxMessageSize caps one incoming frame. Clients only ever send small
 	// messages; ship designs are loaded server-side, never uploaded here.
 	maxMessageSize = 16 * 1024
-	// Incoming messages per second a client may send before it is
-	// disconnected: about 20 states plus fire and hit reports, with slack.
-	maxMessagesPerSecond = 120
+	// Flood protection, as a token bucket: a client may keep up messageRate
+	// messages a second indefinitely (a normal one sends ~20 states plus its
+	// shots and hit reports, ~30), and send up to messageBurst at once.
+	//
+	// The burst allowance is what matters on phones: a mobile connection
+	// that stalls for a few seconds delivers everything the browser queued
+	// meanwhile in one go. A plain per-second count (120/s, as this used to
+	// be) disconnected players on mobile data within seconds of starting.
+	messageRate  = 60.0
+	messageBurst = 400.0
+	// rateLimitGrace gives the "too many messages" notice a chance to reach
+	// the client before its connection is closed.
+	rateLimitGrace = 250 * time.Millisecond
 )
 
 // client is one websocket connection. gorilla/websocket allows a single
@@ -36,9 +46,9 @@ type client struct {
 	closeOnce sync.Once
 	done      chan struct{}
 
-	// Rate limiting, only touched by the reader goroutine.
-	windowStart time.Time
-	windowCount int
+	// Token bucket (see messageRate), only touched by the reader goroutine.
+	tokens   float64
+	tokensAt time.Time
 }
 
 func newClient(conn *websocket.Conn) *client {
@@ -87,13 +97,19 @@ func (c *client) writePump() {
 	}
 }
 
-// allowMessage counts one incoming message and reports whether the client is
-// still within its rate limit.
+// allowMessage spends a token for one incoming message, and reports whether
+// the client had one: false means it has been flooding for long enough to
+// empty a full bucket.
 func (c *client) allowMessage(now time.Time) bool {
-	if now.Sub(c.windowStart) >= time.Second {
-		c.windowStart = now
-		c.windowCount = 0
+	if c.tokensAt.IsZero() {
+		c.tokens = messageBurst
+	} else {
+		c.tokens = min(messageBurst, c.tokens+now.Sub(c.tokensAt).Seconds()*messageRate)
 	}
-	c.windowCount++
-	return c.windowCount <= maxMessagesPerSecond
+	c.tokensAt = now
+	if c.tokens < 1 {
+		return false
+	}
+	c.tokens--
+	return true
 }
