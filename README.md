@@ -17,6 +17,11 @@ go run .          # backend only; needs MongoDB and the env vars below
 go test ./...
 ```
 
+Production (the home server): `scripts/deployProd.sh [all|back|front]
+[release|snapshot] [-y]` deploys the latest release (or snapshot) of both
+repos over SSH and checks the result; see the workspace `CLAUDE.md`,
+"Production server".
+
 `scripts/runDev.sh` checks the setup first (shared `.env`, symlinks, free
 ports, `SHIPS3D_ALLOWED_ORIGINS`), runs both with prefixed logs, prints the
 URLs once both answer, and stops both on Ctrl+C. MongoDB must already be
